@@ -451,11 +451,14 @@ def getApplication(config, passphrase):
     s = [(config[t], t)
          for t in ['python', 'source', 'file'] if config[t]][0]
     filename, style = s[0], {'file': 'pickle'}.get(s[1], s[1])
+    log = logger.Logger()
     try:
-        log.msg("Loading %s..." % filename)
+        log.info("Loading {tacfile!r}...", tacfile=filename)
         application = service.loadApplication(filename, style, passphrase)
-        log.msg("Loaded.")
+        svc = application.getComponent(service.IService)
+        log.info("Loaded {appname!r}.", appname=svc.name)
     except Exception as e:
+        log.failure("Load error.")
         s = "Failed to load application: %s" % e
         if isinstance(e, KeyError) and e.args[0] == "application":
             s += """
@@ -466,9 +469,6 @@ and scans the global variables for one of this name.
 
 Please read the 'Using Application' HOWTO for details.
 """
-        traceback.print_exc(file=log.logfile)
-        log.msg(s)
-        log.deferr()
         sys.exit('\n' + s + '\n')
     return application
 
