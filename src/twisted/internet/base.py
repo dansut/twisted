@@ -29,6 +29,7 @@ from twisted.internet._resolver import (
     ComplexResolverSimplifier as _ComplexResolverSimplifier,
     SimpleResolverComplexifier as _SimpleResolverComplexifier,
 )
+from twisted.logger import _loggerFor
 from twisted.python import log, failure, reflect
 from twisted.python.compat import unicode, iteritems
 from twisted.python.runtime import seconds as runtimeSeconds, platform
@@ -421,7 +422,7 @@ class _ThreePhaseEvent(object):
             try:
                 result = callable(*args, **kwargs)
             except:
-                log.err()
+                _loggerFor(self).failure('Calling event triggers')
             else:
                 if isinstance(result, Deferred):
                     beforeResults.append(result)
@@ -440,7 +441,7 @@ class _ThreePhaseEvent(object):
                 try:
                     callable(*args, **kwargs)
                 except:
-                    log.err()
+                    _loggerFor(self).failure('Calling after phase triggers')
 
 
 
@@ -646,19 +647,19 @@ class ReactorBase(object):
     def sigInt(self, *args):
         """Handle a SIGINT interrupt.
         """
-        log.msg("Received SIGINT, shutting down.")
+        _loggerFor(self).info("Received SIGINT, shutting down.")
         self.callFromThread(self.stop)
 
     def sigBreak(self, *args):
         """Handle a SIGBREAK interrupt.
         """
-        log.msg("Received SIGBREAK, shutting down.")
+        _loggerFor(self).info("Received SIGBREAK, shutting down.")
         self.callFromThread(self.stop)
 
     def sigTerm(self, *args):
         """Handle a SIGTERM interrupt.
         """
-        log.msg("Received SIGTERM, shutting down.")
+        _loggerFor(self).info("Received SIGTERM, shutting down.")
         self.callFromThread(self.stop)
 
     def disconnectAll(self):
@@ -666,7 +667,7 @@ class ReactorBase(object):
         """
         selectables = self.removeAll()
         for reader in selectables:
-            log.callWithLogger(reader,
+            log.callWithLogger(reader, # Does this util func need a new logger equiv?
                                reader.connectionLost,
                                failure.Failure(main.CONNECTION_LOST))
 
@@ -850,7 +851,7 @@ class ReactorBase(object):
                 try:
                     f(*a, **kw)
                 except:
-                    log.err()
+                    _loggerFor(self).failure('Processing thread call queue')
                 count += 1
                 if count == total:
                     break
@@ -877,15 +878,14 @@ class ReactorBase(object):
                 call.called = 1
                 call.func(*call.args, **call.kw)
             except:
-                log.deferr()
+                _loggerFor(self).failure('Dealing with pending timed calls')
                 if hasattr(call, "creator"):
                     e = "\n"
                     e += " C: previous exception occurred in " + \
                          "a DelayedCall created here:\n"
-                    e += " C:"
-                    e += "".join(call.creator).rstrip().replace("\n","\n C:")
-                    e += "\n"
-                    log.msg(e)
+                    e += " C:{creator!r}\n"
+                    cr = "".join(call.creator).rstrip().replace("\n","\n C:")
+                    _loggerFor(self).error(e, creator=cr)
 
 
         if (self._cancellations > 50 and
@@ -1194,7 +1194,7 @@ class _SignalReactorMixin(object):
         try:
             import signal
         except ImportError:
-            log.msg("Warning: signal module unavailable -- "
+            _loggerFor(self).warn("signal module unavailable -- "
                     "not installing signal handlers.")
             return
 
@@ -1254,10 +1254,9 @@ class _SignalReactorMixin(object):
                     t = self.running and t2
                     self.doIteration(t)
             except:
-                log.msg("Unexpected error in main loop.")
-                log.err()
+                _loggerFor(self).failure("Unexpected error in main loop.")
             else:
-                log.msg('Main loop terminated.')
+                _loggerFor(self).info('Main loop terminated.')
 
 
 
