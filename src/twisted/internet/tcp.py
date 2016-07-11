@@ -83,6 +83,7 @@ from errno import errorcode
 # Twisted Imports
 from twisted.internet import base, address, fdesc
 from twisted.internet.task import deferLater
+from twisted.logger import _loggerFor
 from twisted.python import log, failure, reflect
 from twisted.python.util import untilConcludes
 from twisted.internet.error import CannotListenError
@@ -253,7 +254,7 @@ class Connection(_TLSConnectionMixin, abstract.FileDescriptor, _SocketCloser,
                 p.writeConnectionLost()
             except:
                 f = failure.Failure()
-                log.err()
+                _loggerFor(self).failure('Write connection lost')
                 self.connectionLost(f)
 
 
@@ -263,7 +264,7 @@ class Connection(_TLSConnectionMixin, abstract.FileDescriptor, _SocketCloser,
             try:
                 p.readConnectionLost()
             except:
-                log.err()
+                _loggerFor(self).failure('Read connection lost')
                 self.connectionLost(failure.Failure())
         else:
             self.connectionLost(reason)
@@ -990,8 +991,9 @@ class Port(base.BasePort, _SocketCloser):
         # reflect what the OS actually assigned us.
         self._realPortNumber = skt.getsockname()[1]
 
-        log.msg("%s starting on %s" % (
-                self._getLogPrefix(self.factory), self._realPortNumber))
+        _loggerFor(self).info("{factory} starting on {portnum}",
+                factory=self._getLogPrefix(self.factory),
+                portnum=self._realPortNumber)
 
         # The order of the next 5 lines is kind of bizarre.  If no one
         # can explain it, perhaps we should re-arrange them.
@@ -1057,8 +1059,9 @@ class Port(base.BasePort, _SocketCloser):
                         # such a listener is not considered readable, so
                         # accept(2) will never be called.  Calling accept(2) on
                         # such a listener, however, does not return at all.
-                        log.msg("Could not accept new connection (%s)" % (
-                            errorcode[e.args[0]],))
+                        _loggerFor(self).info(
+                            "Could not accept new connection ({err})",
+                            err=errorcode[e.args[0]])
                         break
                     raise
 
@@ -1079,9 +1082,9 @@ class Port(base.BasePort, _SocketCloser):
             #
             # There is no "except SSL.Error:" above because SSL may be
             # None if there is no SSL support.  In any case, all the
-            # "except SSL.Error:" suite would probably do is log.deferr()
+            # "except SSL.Error:" suite would probably do is log
             # and return, so handling it here works just as well.
-            log.deferr()
+            _loggerFor(self).failure('Read socket')
 
     def loseConnection(self, connDone=failure.Failure(main.CONNECTION_DONE)):
         """
@@ -1104,7 +1107,8 @@ class Port(base.BasePort, _SocketCloser):
         """
         Log message for closing port
         """
-        log.msg('(%s Port %s Closed)' % (self._type, self._realPortNumber))
+        _loggerFor(self).info('({socktype} Port {portnum} Closed)',
+            socktype=self._type, portnum=self._realPortNumber)
 
 
     def connectionLost(self, reason):
