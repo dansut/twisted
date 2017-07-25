@@ -215,7 +215,6 @@ def rebuild(module, doLog=1):
     values.update(classes)
     values.update(functions)
     fromOldModule = values.__contains__
-    newclasses = newclasses.keys()
     classes = classes.keys()
     functions = functions.keys()
 
@@ -243,17 +242,20 @@ def rebuild(module, doLog=1):
             clazz.__dict__.clear()
             clazz.__getattr__ = __getattr__
             clazz.__module__ = module.__name__
-    if newclasses:
-        import gc
-    for nclass in newclasses:
+    for nclass in newclasses.keys():
         ga = getattr(module, nclass.__name__)
         if ga is nclass:
             log.msg("WARNING: new-class {} not replaced by reload!".format(
                     reflect.qual(nclass)))
+            del newclasses[nclass]
         else:
-            for r in gc.get_referrers(nclass):
-                if getattr(r, '__class__', None) is nclass:
-                    r.__class__ = ga
+            newclasses[nclass] = ga
+    if newclasses:
+        import gc
+        for obj in gc.get_objects():
+            tcls = getattr(obj, '__class__', None)
+            if tcls in newclasses.keys():
+                obj.__class__ = newclasses[tcls]
     if doLog:
         log.msg('')
         log.msg('  (fixing   {}): '.format(str(module.__name__)))
