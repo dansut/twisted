@@ -100,9 +100,9 @@ class RebuildTests(unittest.TestCase):
         rebuild.rebuild(crash_test_dummy, doLog=False)
         # Instance rebuilding is triggered by attribute access.
         x.do()
-        self.failUnlessIdentical(x.__class__, crash_test_dummy.X)
+        self.assertEqual(x.__class__, crash_test_dummy.X)
 
-        self.failUnlessIdentical(f, crash_test_dummy.foo)
+        self.assertEqual(f, crash_test_dummy.foo)
 
 
     def test_ComponentInteraction(self):
@@ -158,6 +158,32 @@ class RebuildTests(unittest.TestCase):
         self.addCleanup(_cleanup)
         rebuild.rebuild(rebuild)
         self.assertTrue(unhashableObject.hashCalled)
+
+
+    def test_Sensitive(self):
+        """
+        L{twisted.python.rebuild.Sensitive}
+        """
+        from twisted.python import rebuild
+        from twisted.python.rebuild import Sensitive
+        from twisted.spread import banana
+        rebuild.latestClass(banana.Banana)
+
+        class TestSensitive(Sensitive):
+            def test_method(self):
+                pass
+
+        testSensitive = TestSensitive()
+        testSensitive.rebuildUpToDate()
+        self.assertFalse(testSensitive.needRebuildUpdate())
+
+        self.assertEqual(banana.Banana, testSensitive.latestVersionOf(banana.Banana))
+        method = TestSensitive.test_method
+        self.assertEqual(method,
+            testSensitive.latestVersionOf(TestSensitive.test_method))
+        rebuild.rebuild(banana)
+        testSensitive.latestVersionOf(testSensitive.test_method)
+        testSensitive.latestVersionOf(TestSensitive)
 
 
 
